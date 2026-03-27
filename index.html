@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Global IoT Dashboard</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #1a1a1a; color: white; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; padding: 20px; }
+        .card { background: #2d2d2d; padding: 20px; border-radius: 15px; border: 1px solid #444; }
+        .val { font-size: 1.5em; color: #00ffcc; font-weight: bold; }
+        #alert-box { background: #ff4d4d; padding: 20px; display: none; margin: 20px; border-radius: 10px; animation: blink 1s infinite; }
+        @keyframes blink { 0% {opacity: 1;} 50% {opacity: 0.5;} 100% {opacity: 1;} }
+    </style>
+</head>
+<body>
+
+    <h1>Sensor Telemetry (Global)</h1>
+    <div id="alert-box">⚠️ VIBRATION DETECTED! ⚠️</div>
+
+    <div class="grid">
+        <div class="card">Temperature<br><span class="val" id="T">--</span>°C</div>
+        <div class="card">Humidity<br><span class="val" id="H">--</span>%</div>
+        <div class="card">Pressure<br><span class="val" id="P">--</span> hPa</div>
+        <div class="card">Voltage<br><span class="val" id="V">--</span>V</div>
+        <div class="card">Current<br><span class="val" id="A">--</span>A</div>
+        <div class="card">Object Count<br><span class="val" id="Cnt">0</span></div>
+    </div>
+
+    <script>
+        // MQTT Setup
+        const client = new Paho.MQTT.Client("broker.hivemq.com", 8000, "clientId_" + Math.random());
+
+        client.onMessageArrived = (message) => {
+            if (message.destinationName === "iot/vibration") {
+                triggerAlert();
+            } else {
+                parseData(message.payloadString);
+            }
+        };
+
+        function triggerAlert() {
+            document.getElementById('alert-box').style.display = 'block';
+            const speech = new SpeechSynthesisUtterance("Warning. High vibration levels detected. Please check the equipment.");
+            window.speechSynthesis.speak(speech);
+            setTimeout(() => { document.getElementById('alert-box').style.display = 'none'; }, 5000);
+        }
+
+        function parseData(str) {
+            // Split "Cnt:0,V:0.0,A:0.0,T:25,H:40,P:1013"
+            const pairs = str.split(',');
+            pairs.forEach(pair => {
+                const [key, val] = pair.split(':');
+                const element = document.getElementById(key);
+                if (element) element.innerText = val;
+            });
+        }
+
+        client.connect({ onSuccess: () => {
+            client.subscribe("iot/sensors");
+            client.subscribe("iot/vibration");
+            console.log("Connected to MQTT Cloud");
+        }});
+    </script>
+</body>
+</html>
